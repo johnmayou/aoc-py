@@ -21,29 +21,33 @@ def assemble(instructions: typing.TextIO) -> dict[str, int]:
   def parse_instruction(line: str) -> typing.Optional[tuple[str, int]]:
     if match := re.match(r'(\w+) -> (\w+)', line):
       src, dest = match.groups()
-      if val := get(src):
+      val = get(src)
+      if val is not None:
         return dest, val
     elif match := re.match(r'NOT (\w+) -> (\w+)', line):
       src, dest = match.groups()
-      if val := get(src):
+      val = get(src)
+      if val is not None:
         return dest, ~val & uint16max
     elif match := re.match(r'(\w+) AND (\w+) -> (\w+)', line):
       src1, src2, dest = match.groups()
       val1, val2 = get(src1), get(src2)
-      if val1 and val2:
+      if val1 is not None and val2 is not None:
         return dest, (val1 & val2) & uint16max
     elif match := re.match(r'(\w+) OR (\w+) -> (\w+)', line):
       src1, src2, dest = match.groups()
       val1, val2 = get(src1), get(src2)
-      if val1 and val2:
+      if val1 is not None and val2 is not None:
         return dest, (val1 | val2) & uint16max
     elif match := re.match(r'(\w+) LSHIFT (\d+) -> (\w+)', line):
       src, n, dest = match.groups()
-      if val := get(src):
+      val = get(src)
+      if val is not None:
         return dest, (val << int(n)) & uint16max
     elif match := re.match(r'(\w+) RSHIFT (\d+) -> (\w+)', line):
       src, n, dest = match.groups()
-      if val := get(src):
+      val = get(src)
+      if val is not None:
         return dest, (val >> int(n)) & uint16max
     else:
       return None # not calculable yet
@@ -94,4 +98,4 @@ if __name__ == '__main__':
     sys.exit()
     
   with open('input.txt') as f:
-    pprint.pprint(assemble(f))
+    pprint.pprint(assemble(f)['a'])
