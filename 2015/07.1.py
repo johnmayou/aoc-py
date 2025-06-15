@@ -4,68 +4,63 @@ import typing
 import pprint
 import sys
 import io
+import re
 
 uint16max = (1 << 16) - 1
 
 def assemble(instructions: typing.TextIO) -> dict[str, int]:
   wire_map: dict[str, int] = {}
   lines: collections.deque[str] = collections.deque()
-  lines.append(instructions.readline().strip())
   
-  while lines:      
-    line = lines.popleft()
-    parts_str, dest_w = line.split(' -> ')
-    if parts_str.isnumeric():
-      wire_map[dest_w] = int(parts_str) & uint16max
-    elif parts_str.startswith('NOT'):
-      _, w = parts_str.split()
-      if w in wire_map:
-        wire_map[dest_w] = ~wire_map[w] & uint16max
-      else:
-        lines.append(line)
+  if line := instructions.readline().strip():
+    lines.append(line)
+  
+  def get(x: str) -> typing.Optional[int]:
+    return int(x) if x.isdigit() else wire_map.get(x)
+  
+  def parse_instruction(line: str) -> typing.Optional[tuple[str, int]]:
+    if match := re.match(r'(\w+) -> (\w+)', line):
+      src, dest = match.groups()
+      if val := get(src):
+        return dest, val
+    elif match := re.match(r'NOT (\w+) -> (\w+)', line):
+      src, dest = match.groups()
+      if val := get(src):
+        return dest, ~val & uint16max
+    elif match := re.match(r'(\w+) AND (\w+) -> (\w+)', line):
+      src1, src2, dest = match.groups()
+      val1, val2 = get(src1), get(src2)
+      if val1 and val2:
+        return dest, (val1 & val2) & uint16max
+    elif match := re.match(r'(\w+) OR (\w+) -> (\w+)', line):
+      src1, src2, dest = match.groups()
+      val1, val2 = get(src1), get(src2)
+      if val1 and val2:
+        return dest, (val1 | val2) & uint16max
+    elif match := re.match(r'(\w+) LSHIFT (\d+) -> (\w+)', line):
+      src, n, dest = match.groups()
+      if val := get(src):
+        return dest, (val << int(n)) & uint16max
+    elif match := re.match(r'(\w+) RSHIFT (\d+) -> (\w+)', line):
+      src, n, dest = match.groups()
+      if val := get(src):
+        return dest, (val >> int(n)) & uint16max
     else:
-      parts = parts_str.split()
-      match len(parts):
-        case 1:
-          w = parts[0]
-          if w in wire_map:
-            wire_map[dest_w] = wire_map[w]
-          else:
-            lines.append(line)
-        case 3:
-          match parts[1]:
-            case 'AND':
-              w1, _, w2 = parts
-              if w1 in wire_map and w2 in wire_map:
-                wire_map[dest_w] = (wire_map[w1] & wire_map[w2]) & uint16max
-              else:
-                lines.append(line)
-            case 'OR':
-              w1, _, w2 = parts
-              if w1 in wire_map and w2 in wire_map:
-                wire_map[dest_w] = (wire_map[w1] | wire_map[w2]) & uint16max
-              else:
-                lines.append(line)
-            case 'LSHIFT':
-              w, _, pos = parts
-              if w in wire_map:
-                wire_map[dest_w] = (wire_map[w] << int(pos)) & uint16max
-              else:
-                lines.append(line)
-            case 'RSHIFT':
-              w, _, pos = parts
-              if w in wire_map:
-                wire_map[dest_w] = (wire_map[w] >> int(pos)) & uint16max
-              else:
-                lines.append(line)
-            case _:
-              raise RuntimeError(f'Unexpected bitwise operator found: {parts[1]}')
-        case _:
-          raise RuntimeError(f'Unexpected number of parts: {parts}')
-        
-    if (line := instructions.readline().strip()):
-      lines.append(line)
+      return None # not calculable yet
     
+  while lines:
+    line = lines.popleft()
+    
+    result = parse_instruction(line)
+    if result:
+      dest, value = result
+      wire_map[dest] = value
+    else:
+      lines.append(line) # try again later
+      
+    if line := instructions.readline().strip():
+      lines.append(line)
+  
   return wire_map
 
 arg_parser = argparse.ArgumentParser()
